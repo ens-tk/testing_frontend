@@ -85,6 +85,33 @@ const TaskList = () => {
     editModalRef.current.showModal();
   };
 
+  const getTaskColorClass = (task) => {
+    if (task.status === 'Completed') {
+      return 'task-completed';
+    }
+  
+    if (!task.deadline) {
+      return 'task-no-deadline';
+    }
+  
+    const now = new Date();
+    const deadline = new Date(task.deadline);
+  
+    const diffInMs = deadline - now;
+    const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+  
+    if (diffInMs < 0) {
+      return 'task-deadline-overdue';
+    }
+  
+    if (diffInDays <= 3) {
+      return 'task-deadline-soon';
+    }
+  
+    return 'task-default';
+  };
+  
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
@@ -129,21 +156,22 @@ const TaskList = () => {
           <option value="">Без сортировки</option>
           <option value="status-active">По статусу (сначала Active)</option>
           <option value="status-late">По статусу (сначала Late)</option>
-          <option value="priority-low">По приоритету (низкий → высокий)</option>
-          <option value="priority-high">По приоритету (высокий → низкий)</option>
-          <option value="deadline-asc">По дедлайну (↑)</option>
-          <option value="deadline-desc">По дедлайну (↓)</option>
-          <option value="created-oldest">По дате создания (старые)</option>
-          <option value="created-newest">По дате создания (новые)</option>
+          <option value="priority-low">По приоритету (по возрастанию)</option>
+          <option value="priority-high">По приоритету (по убыванию)</option>
+          <option value="deadline-asc">По дедлайну (по возрастанию)</option>
+          <option value="deadline-desc">По дедлайну (по убыванию)</option>
+          <option value="created-oldest">По дате создания (сначала старые)</option>
+          <option value="created-newest">По дате создания (сначала новые)</option>
         </select>
       </div>
 
       <ul className="task-list">
-        {tasks.map((task) => (
-          <li
-            key={task.id}
-            className={`task-item ${task.status.toLowerCase()}`}
-          >
+  {tasks.map((task) => (
+    <li
+      key={task.id}
+      className={`task-item ${getTaskColorClass(task)}`}
+    >
+
             <div onClick={() => openViewModal(task.id)} className="task-title">
               <strong>{task.title}</strong> — {task.priority} — {task.status}
             </div>
@@ -228,15 +256,35 @@ const TaskList = () => {
       <dialog ref={editModalRef} className="modal edit-modal">
   {editingTask && (
     <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        await updateTask(editingTask.id, editingTask);
-        editModalRef.current.close();
-        setEditingTask(null);
-        fetchTasks();
-      }}
-      className="edit-form"
-    >
+  onSubmit={async (e) => {
+    e.preventDefault();
+
+    const updatedTask = {
+      title: editingTask.title?.trim() ?? '',
+      description: editingTask.description ?? '',
+      deadline: editingTask.deadline ? new Date(editingTask.deadline).toISOString() : null,
+
+      priority: editingTask.priority ? editingTask.priority : null,
+    };
+
+    try {
+      const updated = await updateTask(editingTask.id, updatedTask);
+      editModalRef.current.close();
+      setEditingTask(null);
+      await fetchTasks();
+      if (selectedTask && selectedTask.id === updated.id) {
+        setSelectedTask(updated);
+      }
+      
+      
+    } catch (error) {
+      console.error('Ошибка при обновлении задачи', error);
+      alert('Ошибка при обновлении задачи. Проверьте заполненные поля.');
+    }
+  }}
+  className="edit-form"
+>
+
       <h3>Редактировать задачу</h3>
 
       <label>
